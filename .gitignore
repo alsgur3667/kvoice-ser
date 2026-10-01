@@ -1,0 +1,38 @@
+# 비밀값
+.env
+.env.*
+!.env.example
+*.key
+secrets/
+
+# 모델·데이터 (라이선스·용량)
+*.pt
+*.pth
+*.ckpt
+*.npz
+*.wav
+*.mp3
+*.m4a
+*.flac
+models/
+work/
+data/
+audio_16000/
+
+# 로그·캐시
+logs/
+runs/
+tb/
+*.log
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# OS·에디터
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.bak

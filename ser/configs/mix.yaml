@@ -1,0 +1,70 @@
+# ===== AI-Hub + SKT 혼합 학습 =====
+#  merge_manifest.py 가 만든 work/manifest_split_mix.csv 를 읽는다 (tag: mix).
+#  model 섹션은 pilot_1006 과 같아야 --init-from 이 된다.
+#  성능 판정은 AI-Hub test 로만 한다 (merge 가 추가분을 전부 train 으로 넣음).
+
+paths:
+  work_root: "./work"
+  tag: "mix"
+
+label:
+  classes: [angry, sadness, happy, neutral, fear, disgust, surprise]
+  min_votes: 1               # 평가자 투표가 없다. skt_manifest.py 가 1로 채운다
+  drop_tie: false
+  use_soft_label: true
+  soft_weight: 0.5
+
+audio:
+  sample_rate: 16000
+  mono: true
+  peak_norm: true
+  trim_db: 30
+  min_sec: 0.8
+  max_sec: 8.0
+  cache_format: "wav"
+
+split:
+  mode: "speaker_list"       # 8명뿐이라 비율 자동분할이 성립하지 않는다. 직접 지정한다.
+  # 성별을 양쪽에 균형있게 두되, train 에 4명을 남긴다.
+  val_speakers:  [F0003, M0003]
+  test_speakers: [F0004, M0004]
+  seed: 42
+
+model:
+  # 4090 24GB 두 장이라 LoRA 없이 통째로 파인튜닝할 수 있다.
+  backbone: "microsoft/wavlm-base-plus"
+  freeze_feature_encoder: true
+  freeze_first_n_layers: 0
+  pooling: "attentive_stat"
+  head_hidden: 256
+  dropout: 0.2
+  use_lora: false
+  lora_r: 16
+
+train:
+  epochs: 10
+  batch_size: 32             # 4090 24GB 기준. 8GB 노트북의 8에서 4배
+  grad_accum: 1
+  lr_backbone: 1.0e-5
+  lr_head: 1.0e-3
+  weight_decay: 0.01
+  warmup_ratio: 0.1
+  precision: "bf16"
+  grad_checkpointing: false  # VRAM 이 남으니 끈다. 속도가 30~40% 빨라진다
+  num_workers: 16            # 32코어
+  balanced_sampler: true
+  loss: "cb_focal"
+  focal_gamma: 1.5
+  label_smoothing: 0.05
+  early_stop_patience: 3
+  val_every: 0
+  monitor: "uar"
+
+augment:
+  speed_perturb: [0.9, 1.0, 1.1]
+  gain_db: [-6, 6]
+  noise_snr_db: [10, 30]
+  noise_prob: 0.3
+  specaug_time: 2
+  specaug_freq: 2
+  mixup_alpha: 0.0

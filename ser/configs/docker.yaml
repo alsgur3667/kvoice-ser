@@ -1,0 +1,71 @@
+# 컨테이너 전용 설정 — base.yaml 과 경로/배치만 다르다
+paths:
+  raw_root: "/data"                 # 원본 데이터셋 (읽기전용 마운트)
+  csv:
+    y4:  "4차년도.csv"
+    y5:  "5차년도.csv"
+    y5b: "5차년도_2차.csv"
+  wav_subdir:
+    y4:  "4차년도"
+    y5:  "5차년도/5차_wav"
+    y5b: "5차년도_2차"
+  work_root: "/work"                # manifest / 캐시 / 체크포인트 (쓰기 마운트)
+
+label:
+  classes: [angry, sadness, happy, neutral, fear, disgust, surprise]
+  min_votes: 2
+  drop_tie: true
+  use_soft_label: true
+  soft_weight: 0.5
+
+audio:
+  sample_rate: 16000
+  mono: true
+  peak_norm: true
+  trim_db: 30
+  min_sec: 0.8
+  max_sec: 8.0               # 학습 시 crop 길이 (캐시는 원본 보존)
+  cache_format: "wav"
+
+split:
+  mode: "speaker"
+  test_speaker_ratio: 0.15
+  val_speaker_ratio: 0.15
+  seed: 42
+
+model:
+  backbone: "microsoft/wavlm-base-plus"
+  freeze_feature_encoder: true
+  freeze_first_n_layers: 0
+  pooling: "attentive_stat"
+  head_hidden: 256
+  dropout: 0.2
+  use_lora: false
+  lora_r: 16
+
+train:
+  epochs: 20
+  batch_size: 8
+  grad_accum: 4
+  lr_backbone: 1.0e-5
+  lr_head: 1.0e-3
+  weight_decay: 0.01
+  warmup_ratio: 0.1
+  precision: "bf16"
+  grad_checkpointing: true
+  num_workers: 4
+  balanced_sampler: true
+  loss: "cb_focal"
+  focal_gamma: 1.5
+  label_smoothing: 0.05
+  early_stop_patience: 5
+  monitor: "uar"
+
+augment:
+  speed_perturb: [0.9, 1.0, 1.1]
+  gain_db: [-6, 6]
+  noise_snr_db: [10, 30]
+  noise_prob: 0.3
+  specaug_time: 2
+  specaug_freq: 2
+  mixup_alpha: 0.0

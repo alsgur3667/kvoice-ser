@@ -1,0 +1,39 @@
+services:
+  # ① API — 업로드 받고 DB에 작업을 등록, 결과 조회
+  api:
+    build: ./api
+    env_file: .env
+    ports: ["${API_PORT:-8000}:8000"]
+    volumes:
+      - ./models:/models                 # WavLM 사전학습 캐시 (HF_HOME)
+      - ../ser:/app/ser_src:ro           # 학습 코드 + 체크포인트 (읽기 전용)
+      - ./api/app:/app/app:ro            # 코드 수정 → 다시 빌드 없이 재시작만
+      - ./api/ser:/app/ser:ro
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ② 워커 — 큐에 쌓인 분석을 하나씩 집어서 실제 추론
+  worker:
+    build: ./api                          # API와 같은 이미지, 실행 명령만 다름
+    env_file: .env
+    volumes:
+      - ./models:/models
+      - ../ser:/app/ser_src:ro
+      - ./api/app:/app/app:ro
+      - ./api/ser:/app/ser:ro
+    command: python -m app.worker
+    depends_on: [api]
+
+  # ③ 웹 — 데모 화면 정적 서빙 + /api 프록시
+  web:
+    build: ./web
+    ports: ["${WEB_PORT:-8080}:80"]
+    volumes:
+      # 화면 파일을 통째로 연결 → index.html / live.js 를 고치면
+      # 다시 빌드하지 않고 브라우저 새로고침만 하면 반영된다
+      - ./web:/usr/share/nginx/html:ro
+    depends_on: [api]

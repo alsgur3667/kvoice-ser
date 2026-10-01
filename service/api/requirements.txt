@@ -1,0 +1,12 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+httpx==0.28.1
+pydantic==2.10.4
+pydantic-settings==2.7.1
+numpy==2.2.1
+soundfile==0.13.0
+# 추론용 (MOCK=1 로만 쓸 거면 아래 세 줄 주석 처리 → 이미지가 2GB 가벼워짐)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1
+transformers==4.48.0

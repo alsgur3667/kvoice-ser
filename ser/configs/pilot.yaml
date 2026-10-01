@@ -1,0 +1,80 @@
+# ===== PILOT: 파이프라인 검증 + 첫 숫자 뽑기용 =====
+#  · 5명 중 4명 이상 합의한 고신뢰 샘플만 (약 25,000개)
+#  · 6초 / 5 epoch  -> 노트북 4060 8GB 에서 2~3시간
+#  · 여기서 UAR 0.45 이상 나오면 full 로 넘어가면 된다
+#  · 오디오 캐시(work/audio_16000)는 full 과 공유하므로 전처리는 한 번만 한다
+paths:
+  # 원본 (윈도우 노트북 기준 — 서버로 옮기면 경로만 수정)
+  raw_root: "C:/Users/user/Downloads/감정 분류를 위한 대화 음성 데이터셋"
+  csv:
+    y4:  "4차년도.csv"
+    y5:  "5차년도.csv"
+    y5b: "5차년도_2차.csv"
+  wav_subdir:                # 소스별 wav 폴더 (build_manifest.py 가 사용)
+    y4:  "4차년도"
+    y5:  "5차년도/5차_wav"
+    y5b: "5차년도_2차"
+  work_root: "./work"        # manifest / 16kHz 캐시 / 체크포인트
+
+label:
+  classes: [angry, sadness, happy, neutral, fear, disgust, surprise]
+  # 7클래스가 너무 어려우면 아래로 교체 (상담/비즈니스 실전용 4클래스)
+  # classes: [negative, neutral, positive, surprise]
+  min_votes: 4               # 4명 이상 합의 = 고신뢰 서브셋
+  drop_tie: true             # 동점 샘플 제거
+  use_soft_label: true       # 5명 투표 분포를 soft target 으로 사용
+  soft_weight: 0.5           # loss = (1-w)*CE(hard) + w*KL(soft)
+
+audio:
+  sample_rate: 16000
+  mono: true
+  peak_norm: true            # 피크 -1dBFS 정규화 (녹음 레벨 차이 제거)
+  trim_db: 30                # 앞뒤 무음 제거 임계값 (None 이면 미적용)
+  min_sec: 0.8
+  max_sec: 6.0               # 학습 시 crop 길이 (캐시는 원본 보존)
+  cache_format: "wav"        # wav | npy
+
+split:
+  mode: "speaker"            # speaker | random(절대 쓰지 말 것)
+  test_speaker_ratio: 0.15
+  val_speaker_ratio: 0.15
+  seed: 42
+
+model:
+  backbone: "microsoft/wavlm-base-plus"
+  # 대안: "kresnik/wav2vec2-large-xlsr-korean" (한국어 사전학습, 8GB에선 LoRA 필수)
+  #       "team-lucid/wav2vec2-base-korean"
+  freeze_feature_encoder: true   # CNN 인코더 동결 (거의 항상 이득)
+  freeze_first_n_layers: 0
+  pooling: "attentive_stat"      # mean | attentive_stat
+  head_hidden: 256
+  dropout: 0.2
+  use_lora: false                # large 백본 쓸 때 true
+  lora_r: 16
+
+train:
+  epochs: 5
+  batch_size: 8                  # 4060 8GB 기준
+  grad_accum: 2                  # 실효 배치 32 (DDP 2장이면 64)
+  lr_backbone: 1.0e-5
+  lr_head: 1.0e-3
+  weight_decay: 0.01
+  warmup_ratio: 0.1
+  precision: "bf16"
+  grad_checkpointing: true
+  num_workers: 4
+  balanced_sampler: true         # 클래스 불균형 13.6:1 대응
+  loss: "cb_focal"               # ce | weighted_ce | cb_focal
+  focal_gamma: 1.5
+  label_smoothing: 0.05
+  early_stop_patience: 3
+  monitor: "uar"                 # 불균형이라 accuracy 말고 UAR
+
+augment:
+  speed_perturb: [0.9, 1.0, 1.1]
+  gain_db: [-6, 6]
+  noise_snr_db: [10, 30]
+  noise_prob: 0.3
+  specaug_time: 2
+  specaug_freq: 2
+  mixup_alpha: 0.0
